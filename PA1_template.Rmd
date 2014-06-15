@@ -1,20 +1,91 @@
-# Reproducible Research: Peer Assessment 1
+Reproducible research
+=====
+Peer assignment 1
+---------
+Loading data into  R using `fread` command from `data.table` packaged
+``` {r} 
+require(data.table)
+dt <- fread('activity.csv')
+````
+### 1. What is mean total number of steps taken per day?
 
+#### 1.1 Histogram of average steps per day
+```{r} 
+dt[,meanSteps:=mean(steps,na.rm=T),by=date]
+mean.per.day <- unique(na.omit(dt[,list(meanSteps,date)]),by='date')
+require(ggplot2)
+ggplot(mean.per.day,aes(x=as.Date(date),y=meanSteps,fill=meanSteps))+geom_histogram(stat='identity')+theme_bw()+ggtitle('Average steps per day')+xlab('Days')+ylab('steps')
+```
 
-## Loading and preprocessing the data
+#### 1.2 Mean and median of total steps taken per day
+``` {r}
+c(mean=dt[,mean(steps,na.rm=T)], median=dt[,median(steps,na.rm=T)])
+```
 
+### 2. What is the average daily activity pattern?
+#### 2.1 A time series plot of the 5-minute interval and the average number of steps taken
+```{r}
+dt[,meanPerDay:=mean(steps,na.rm=T),by=interval]
+ggplot(dt,aes(x=interval,y=meanPerDay))+geom_line()+theme_bw()+ggtitle('Average steps per  5 minute interval')+xlab('5 min. interval')+ylab('Steps')
+```
 
+#### 2.2 Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
 
-## What is mean total number of steps taken per day?
+```{r}
+dt[which.max(dt[,meanPerDay])][,interval]
+```
 
+### 3. Imputing missing values
 
+#### 3.1 Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+```{r}
+dt[,.N,is.na(steps)][1,N]
+```
 
-## What is the average daily activity pattern?
+#### 3.2 Devise a strategy for filling in all of the missing values in the dataset. The strategy is average steps per day calculated in 2.1. I use `ifelse` statement to check if `is.na(steps)=TRUE` then replace `NA` with `meanPerDay`.
 
+```{r}
+dt[,fillNA:=ifelse(is.na(steps),meanPerDay,steps)]
+```
 
+#### 3.3 Create a new dataset that is equal to the original dataset but with the missing data filled in.
+```{r}
+new.dt <- dt[,fillNA:=ifelse(is.na(steps),meanPerDay,steps)]
+```
 
-## Imputing missing values
+#### 3.4 Make a histogram of the total number of steps taken each day 
+```{r} 
+new.dt[,meanStepsFill:=mean(fillNA),by=date]
+mean.per.day.filled <- unique(na.omit(dt[,list(meanStepsFill,date)]),by='date')
+require(ggplot2)
+ggplot(mean.per.day.filled,aes(x=as.Date(date),y=meanStepsFill,fill=meanStepsFill))+geom_histogram(stat='identity')+theme_bw()+ggtitle('Average steps per day')+xlab('Days')+ylab('steps')
+```
 
+#### 3.5 Calculate and report the mean and median total number of steps taken per day. 
 
+``` {r}
+c(mean=new.dt[,mean(fillNA)], median=new.dt[,median(fillNA)])
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+#### 3.6 Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+I my case, the values are the same, i.e. filling `NA` with the average stpes per day did not introduce any bias in the data. 
+
+## 4 Are there differences in activity patterns between weekdays and weekends?
+
+For this part the weekdays() function may be of some help here. Use the dataset with the filled-in missing values for this part.
+
+#### 4.1 Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r}
+new.dt[,wkday:=weekdays(as.Date(date))]
+new.dt[,weekend:=ifelse(wkday!='Saturday'& wkday!='Sunday','weekday','weekend')]
+
+```
+
+#### 4.2 Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+```{r}
+new.dt[,meanPerWkday:=mean(fillNA),by=list(weekend,interval)]
+ggplot(new.dt,aes(x=interval,y=meanPerWkday))+geom_line()+facet_wrap(~weekend,ncol=1)+theme_bw()+ggtitle('Average steps per weekdays and weekends')+ylab('Steps')
+```
+
